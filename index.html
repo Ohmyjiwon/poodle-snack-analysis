@@ -1,0 +1,493 @@
+<!doctype html>
+<html lang="ko">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>통통한 푸들 간식 분석</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one 16:9 stage scaled to the window; every size inside is em of a stage-width-based font, so the deck scales as one piece. Narrow portrait screens get a stacked reading view. */
+:root{
+  --bg:#e6ece5; --surface:#f4f7f3; --ink:#12261f; --ink2:#45584f; --muted:#6f7f77; --line:#d3dcd3; --track:#dde5dd;
+  --a:#b5651d; --b:#009a9e; --accent-ink:#8a4a12; --fur:#a9642b; --fur2:#8a4e1f;
+  --display:"Black Han Sans","IBM Plex Sans KR",system-ui,sans-serif;
+  --body:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#09110e; --surface:#0f1a16; --ink:#eef4ef; --ink2:#b7c5bc; --muted:#8a9b92; --line:#24332c; --track:#1d2a24;
+  --a:#c9803a; --b:#1f9c99; --accent-ink:#e3a468; --fur:#c9803a; --fur2:#a3622a; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#09110e; --surface:#0f1a16; --ink:#eef4ef; --ink2:#b7c5bc; --muted:#8a9b92; --line:#24332c; --track:#1d2a24;
+  --a:#c9803a; --b:#1f9c99; --accent-ink:#e3a468; --fur:#c9803a; --fur2:#a3622a; color-scheme:dark }
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);display:flex;flex-direction:column;overflow:hidden;word-break:keep-all}
+.wrap{flex:1;min-height:0;container-type:size;display:grid;place-items:center;padding-inline:16px;padding-block:12px 0}
+.stage{width:min(100cqw,calc(100cqh * 16 / 9));aspect-ratio:16/9;max-width:100%;container-type:inline-size;position:relative;overflow:hidden;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+.slide{position:absolute;inset:0;padding:3.4em 4.4em 2.6em;font-size:1.5cqw;display:flex;flex-direction:column;gap:1.3em;opacity:0;visibility:hidden;transform:translateX(2.5%);transition:opacity .45s ease,transform .45s ease,visibility 0s .45s}
+.slide.on{opacity:1;visibility:visible;transform:none;transition:opacity .45s ease,transform .45s ease}
+.slide.prev{transform:translateX(-2.5%)}
+
+.eyebrow{font-size:.8em;font-weight:600;letter-spacing:.14em;color:var(--muted);text-transform:uppercase}
+h1,h2{font-family:var(--display);font-weight:400;margin:0;text-wrap:balance;line-height:1.12}
+h1{font-size:4.6em}
+h2{font-size:2.5em}
+h2 em,h1 em{font-style:normal;color:var(--accent-ink)}
+p{margin:0;line-height:1.55}
+.lead{font-size:1.2em;color:var(--ink2);max-width:38em}
+.src{margin-top:auto;font-size:.68em;color:var(--muted);line-height:1.45}
+.cols{display:grid;gap:2.6em;flex:1;min-height:0;align-items:center}
+.c2{grid-template-columns:1fr 1fr}.c32{grid-template-columns:3fr 2fr}.c23{grid-template-columns:2fr 3fr}.c3{grid-template-columns:repeat(3,1fr)}
+.cols>*{min-width:0}
+.stack{display:flex;flex-direction:column;gap:1em}
+.note{font-size:.85em;color:var(--ink2);border-left:.2em solid var(--line);padding-left:.9em}
+.big{font-family:var(--display);font-size:4.2em;line-height:1}
+.big small{font-size:.38em;font-family:var(--body);font-weight:600;color:var(--ink2);margin-left:.2em}
+.stat .lab{font-size:.9em;color:var(--ink2);margin-top:.4em}
+.card{border:1px solid var(--line);border-radius:.6em;padding:1.3em 1.4em;display:flex;flex-direction:column;gap:.5em;height:100%}
+.card h3{margin:0;font-size:1.05em;font-weight:700}
+.card p{font-size:.86em;color:var(--ink2)}
+.legend{display:flex;flex-wrap:wrap;gap:1.2em;font-size:.8em;color:var(--ink2)}
+.legend span::before{content:"";display:inline-block;width:.8em;height:.8em;border-radius:.2em;margin-right:.4em;vertical-align:-.05em;background:var(--c)}
+.ka{--c:var(--a)}.kb{--c:var(--b)}.kn{--c:var(--muted)}
+
+/* reveal */
+.slide.on .rv{animation:rise .6s cubic-bezier(.2,.7,.2,1) both;animation-delay:calc(var(--i,0) * 110ms + 150ms)}
+@keyframes rise{from{opacity:0;transform:translateY(1em)}}
+@keyframes grow{from{transform:scaleX(0)}}
+@keyframes pop{from{transform:scale(0);opacity:0}}
+@keyframes bob{50%{transform:translateY(-2.5%)}}
+@keyframes wag{50%{transform:rotate(14deg)}}
+
+/* bars */
+.bars{display:grid;gap:.55em;font-size:.9em}
+.row{display:grid;grid-template-columns:var(--lw,9em) 1fr 4.2em;gap:.8em;align-items:center}
+.row .l{color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row.hl .l{color:var(--ink);font-weight:700}
+.row .t{position:relative;height:1.1em}
+.row .t i{position:absolute;left:0;top:0;bottom:0;width:var(--w);background:var(--c,var(--b));border-radius:0 4px 4px 0;transform-origin:left}
+.row .t u{position:absolute;top:-.3em;bottom:-.3em;left:var(--x);border-left:1px solid var(--muted)}
+.row .v{font-variant-numeric:tabular-nums;font-weight:600}
+.slide.on .row .t i{animation:grow .9s cubic-bezier(.2,.7,.2,1) both;animation-delay:calc(var(--i,0) * 70ms + 350ms)}
+.axisnote{font-size:.72em;color:var(--muted)}
+
+/* waffle */
+.waffle{display:grid;grid-template-columns:repeat(10,1fr);gap:.22em;width:11em}
+.waffle b{aspect-ratio:1;border-radius:50%;background:var(--track)}
+.waffle b.f{background:var(--a)}
+.slide.on .waffle b.f{animation:pop .4s both;animation-delay:calc(var(--i) * 18ms + 400ms)}
+
+/* dumbbell */
+.db{display:grid;gap:1.6em}
+.db .t{position:relative;height:1.6em;margin-inline:.6em}
+.db .t::before{content:"";position:absolute;left:0;right:0;top:50%;border-top:1px solid var(--line)}
+.db .seg{position:absolute;top:calc(50% - .12em);height:.24em;left:var(--f);width:calc(var(--to) - var(--f));background:var(--a);transform-origin:left}
+.db .d{position:absolute;top:50%;width:1em;height:1em;margin:-.5em;border-radius:50%;border:2px solid var(--surface)}
+.db .d.f{left:var(--f);background:var(--muted)} .db .d.e{left:var(--to);background:var(--a)}
+.db .tx{display:flex;justify-content:space-between;font-size:.9em;margin-bottom:.3em}
+.slide.on .db .seg{animation:grow 1s .5s both} .slide.on .db .d.e{animation:pop .4s 1.3s both}
+
+/* pips */
+.pips{display:flex;gap:.3em}
+.pips b{width:1.1em;height:1.1em;border-radius:50%;background:var(--track)}
+.pips b.f{background:var(--c,var(--a))}
+.slide.on .pips b.f{animation:pop .4s both;animation-delay:calc(var(--i) * 90ms + 400ms)}
+
+/* flow */
+.flow{display:grid;grid-template-columns:repeat(4,1fr);gap:1em}
+.flow div{border:1px solid var(--line);border-radius:.6em;padding:1.1em;position:relative}
+.flow .big{font-size:3em}
+.flow div+div::before{content:"→";position:absolute;left:-.95em;top:42%;color:var(--muted)}
+
+/* stacked share */
+.share{display:flex;gap:2px;height:1.5em}
+.share i{background:var(--c);flex:var(--n);transform-origin:left;border-radius:3px}
+.slide.on .share i{animation:grow .8s .4s both}
+
+svg text{font-family:var(--body);fill:var(--muted)}
+.strip .lab{fill:var(--ink2);font-weight:600}
+.strip line{stroke:var(--line)}
+.strip .med{stroke:var(--ink);stroke-width:2}
+.strip circle{stroke:var(--surface);stroke-width:2;cursor:default}
+.slide.on .strip circle{animation:pop .5s both;animation-delay:calc(var(--i) * 40ms + 400ms);transform-box:fill-box;transform-origin:center}
+
+.poodle{width:100%;max-width:21em;justify-self:center;animation:bob 3.2s ease-in-out infinite}
+.poodle .tail{transform-box:fill-box;transform-origin:left bottom;animation:wag .7s ease-in-out infinite}
+
+input[type=range]{width:100%;accent-color:var(--a)}
+.meter{height:1.4em;background:var(--track);border-radius:4px;position:relative;overflow:hidden}
+.meter i{position:absolute;left:0;top:0;bottom:0;width:10%;background:var(--a)}
+ol.take{margin:0;padding-left:1.3em;display:grid;gap:.75em;font-size:1.02em;line-height:1.5}
+ol.take b{color:var(--accent-ink)}
+ul.srcs{margin:0;padding-left:1.1em;display:grid;gap:.5em;font-size:.8em;color:var(--ink2);line-height:1.45}
+a{color:inherit;text-decoration-color:var(--muted);text-underline-offset:.2em}
+a:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid var(--a);outline-offset:2px}
+
+#tip{position:fixed;z-index:9;pointer-events:none;background:var(--ink);color:var(--surface);font-size:12px;line-height:1.4;padding:6px 9px;border-radius:6px;max-width:260px}
+
+nav{display:flex;align-items:center;gap:12px;padding:8px 16px calc(8px + env(safe-area-inset-bottom,0px));font-size:13px;color:var(--ink2)}
+nav button{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:5px 12px;cursor:pointer}
+nav button:hover{border-color:var(--muted)}
+nav .prog{flex:1;height:3px;background:var(--track);border-radius:2px;overflow:hidden}
+nav .prog i{display:block;height:100%;width:0;background:var(--a);transition:width .4s}
+nav .cnt{font-variant-numeric:tabular-nums;min-width:4em;text-align:center}
+
+@media (max-width:700px) and (orientation:portrait){
+  body{overflow:auto;display:block}
+  .wrap{container-type:normal;display:block;padding-block:8px 24px}
+  .stage{width:100%;aspect-ratio:auto;overflow:visible;border:0;background:none;container-type:normal}
+  .slide{position:static;opacity:1;visibility:visible;transform:none;font-size:14px;padding:28px 18px;margin-bottom:12px;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+  .cols,.flow{grid-template-columns:1fr}
+  .flow div+div::before{display:none}
+  h1{font-size:2.6em} h2{font-size:1.8em}
+  .row{--lw:7em}
+  nav{display:none}
+}
+@media (prefers-reduced-motion: reduce){ *,*::before,*::after{animation:none!important;transition:none!important} }
+</style>
+
+<div class="wrap"><main class="stage" id="stage">
+
+<section class="slide on">
+  <div class="cols c32">
+    <div class="stack">
+      <div class="eyebrow rv">반려견 비만 × 간식 데이터 분석</div>
+      <h1 class="rv" style="--i:1">통통한 푸들에게<br><em>간식</em>을 줘도 될까</h1>
+      <p class="lead rv" style="--i:2">한국 가정의 반려견 비만 현황을 정리하고, 쿠팡·다나와에서 모은 다이어트 간식 36개의 가격과 노출 데이터를 분석했습니다.</p>
+      <p class="rv" style="--i:3;color:var(--muted);font-size:.85em">2026년 10월 2일 조사 · ← → 키로 넘기기</p>
+    </div>
+    <svg class="poodle rv" style="--i:2" viewBox="0 0 300 260" role="img" aria-label="통통한 갈색 푸들 그림">
+      <g class="tail"><rect x="226" y="118" width="34" height="9" rx="4" fill="var(--fur2)" transform="rotate(-35 226 122)"/><circle cx="262" cy="96" r="17" fill="var(--fur)"/></g>
+      <rect x="92" y="186" width="20" height="46" rx="9" fill="var(--fur2)"/><rect x="196" y="186" width="20" height="46" rx="9" fill="var(--fur2)"/>
+      <ellipse cx="158" cy="150" rx="88" ry="62" fill="var(--fur)"/>
+      <rect x="120" y="190" width="20" height="46" rx="9" fill="var(--fur2)"/><rect x="170" y="190" width="20" height="46" rx="9" fill="var(--fur2)"/>
+      <circle cx="102" cy="238" r="14" fill="var(--fur)"/><circle cx="130" cy="242" r="14" fill="var(--fur)"/><circle cx="180" cy="242" r="14" fill="var(--fur)"/><circle cx="206" cy="238" r="14" fill="var(--fur)"/>
+      <circle cx="42" cy="92" r="24" fill="var(--fur2)"/><circle cx="116" cy="92" r="24" fill="var(--fur2)"/>
+      <circle cx="80" cy="92" r="40" fill="var(--fur)"/><circle cx="80" cy="48" r="26" fill="var(--fur)"/>
+      <ellipse cx="72" cy="108" rx="20" ry="15" fill="var(--surface)" opacity=".35"/>
+      <circle cx="64" cy="86" r="4.5" fill="var(--ink)"/><circle cx="92" cy="86" r="4.5" fill="var(--ink)"/><ellipse cx="72" cy="103" rx="6" ry="4.5" fill="var(--ink)"/>
+    </svg>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="eyebrow rv">배경</div>
+  <h2 class="rv" style="--i:1">국민 열 명 중 셋이 반려인인 나라</h2>
+  <div class="cols c3" style="align-items:start">
+    <div class="stat rv" style="--i:2"><div class="big"><span data-n="591">591</span><small>만 가구</small></div><div class="lab">반려가구 수. 전체 가구의 26.7%</div></div>
+    <div class="stat rv" style="--i:3"><div class="big"><span data-n="546">546</span><small>만 마리</small></div><div class="lab">반려견 수. 2023년 556만에서 처음으로 감소</div></div>
+    <div class="stat rv" style="--i:4"><div class="big"><span data-n="19.4" data-d="1">19.4</span><small>만 원</small></div><div class="lab">반려가구의 월평균 양육비</div></div>
+  </div>
+  <p class="note rv" style="--i:5">반려견 수는 줄었지만 한 마리에 쓰는 돈과 관심은 커졌습니다. 건강 관리, 그중에서도 체중이 새 관심사로 떠올랐습니다.</p>
+  <p class="src">출처: KB경영연구소 「2025 한국 반려동물 보고서」(2024년 말 기준), 데일리벳 보도</p>
+</section>
+
+<section class="slide">
+  <div class="eyebrow rv">비만 현황</div>
+  <h2 class="rv" style="--i:1">병원에서 비만 판정은 <em>14.7%</em>, 검진해 보면 40%</h2>
+  <div class="cols c2">
+    <div class="stack rv" style="--i:2;align-items:center;text-align:center">
+      <div class="waffle" data-fill="15"></div>
+      <div><b>14.7%</b> 수의사에게 비만 판정을 받음</div>
+      <div class="axisnote">KB 2025, 반려동물 1,488마리 기준</div>
+    </div>
+    <div class="stack rv" style="--i:3;align-items:center;text-align:center">
+      <div class="waffle" data-fill="40"></div>
+      <div><b>40%</b> 건강검진에서 과체중 또는 비만</div>
+      <div class="axisnote">2015년 이리온·SK텔레콤 체험단 500여 마리</div>
+    </div>
+  </div>
+  <p class="note rv" style="--i:4">두 조사는 시기와 대상이 달라 직접 비교할 수는 없습니다. 다만 병원에서 판정받기 전까지 비만을 모르고 지나치는 가정이 많다는 점을 보여 줍니다.</p>
+  <p class="src">출처: KB경영연구소 2025 보고서 이슈2 「반려동물 비만 관리」, 한국일보(2017) 보도</p>
+</section>
+
+<section class="slide">
+  <div class="eyebrow rv">추세</div>
+  <h2 class="rv" style="--i:1">해외 통계에서는 비만 반려견이 <em>꾸준히 늘었다</em></h2>
+  <div class="cols c32">
+    <div class="db rv" style="--i:2">
+      <div><div class="tx"><span>고도비만(BCS 8~9) 반려견 비율 · 미국 Banfield</span><b>10% → 19%</b></div>
+        <div class="t" style="--f:40%;--to:76%"><i class="seg"></i><i class="d f" data-tip="2007년 10%"></i><i class="d e" data-tip="2018년 19%"></i></div>
+        <div class="axisnote">2007년 → 2018년</div></div>
+      <div><div class="tx"><span>수의사 비만 진단 반려견 비율 · 미국</span><b>8% → 12%</b></div>
+        <div class="t" style="--f:32%;--to:48%"><i class="seg"></i><i class="d f" data-tip="2018년 8%"></i><i class="d e" data-tip="2024년 12%"></i></div>
+        <div class="axisnote">2018년 → 2024년 · 눈금 0~25%</div></div>
+    </div>
+    <div class="stack rv" style="--i:3">
+      <div class="big">59<small>%</small></div>
+      <p style="color:var(--ink2)">미국 반려견 중 과체중 또는 비만으로 분류된 비율 (APOP, 2022)</p>
+      <p class="note">국내는 같은 방식으로 여러 해를 추적한 공개 통계를 찾지 못했습니다. 그래서 추세는 해외 자료로 대신 봤습니다.</p>
+    </div>
+  </div>
+  <p class="src">출처: Banfield 동물병원 자료(로얄캐닌 인용, 데일리벳), KB경영연구소 2025 보고서에 인용된 미국 통계·APOP</p>
+</section>
+
+<section class="slide">
+  <div class="eyebrow rv">품종</div>
+  <h2 class="rv" style="--i:1">작은 품종일수록 비만 판정이 많다</h2>
+  <div class="cols c32">
+    <div class="stack rv" style="--i:2"><div class="bars" id="breed" style="--lw:7.5em"></div>
+      <div class="axisnote">품종별 비만 판정 비율(%) · 세로선은 전체 평균 14.7%</div></div>
+    <div class="stack rv" style="--i:3">
+      <p class="lead" style="font-size:1.05em">요크셔테리어, 치와와, 포메라니안은 다섯 마리 중 한 마리 이상이 비만 판정을 받았습니다.</p>
+      <p class="note">푸들 단독 수치는 공개 자료에서 확인하지 못했습니다. 푸들 혈통이 섞인 말티푸는 11.1%로 평균보다 낮습니다. 푸들이라서 찌는 것이 아니라 생활 습관의 영향이 크다고 볼 수 있습니다.</p>
+    </div>
+  </div>
+  <p class="src">출처: KB경영연구소 「2025 한국 반려동물 보고서」 이슈2</p>
+</section>
+
+<section class="slide">
+  <div class="eyebrow rv">원인</div>
+  <h2 class="rv" style="--i:1">살찌는 이유는 <em>먹는 양, 움직임, 중성화</em></h2>
+  <div class="cols c3" style="align-items:stretch">
+    <div class="card rv" style="--i:2"><div class="big">10<small>%</small></div><h3>간식은 하루 열량의 10% 이내</h3><p>연구와 수의사 설명에서 첫째로 꼽히는 원인은 간식 섭취량 증가, 자율배식, 사료량 조절 실패 같은 식습관입니다.</p></div>
+    <div class="card rv" style="--i:3"><div class="big">30<small>분</small></div><h3>하루 활동 권장량</h3><p>실내 생활이 길고 산책이 짧으면 먹은 만큼 쓰지 못합니다. 반려견은 하루 30분 안팎의 활동이 권장됩니다.</p></div>
+    <div class="card rv" style="--i:4"><div class="big" style="font-size:3.1em;padding-block:.18em">−20~30<small>%</small></div><h3>중성화 후 필요 열량 감소</h3><p>중성화 뒤에는 필요 열량이 줄어듭니다. 급여량을 그대로 두면 체중이 서서히 늡니다.</p></div>
+  </div>
+  <div class="cols c2 rv" style="--i:5;flex:none;gap:2em">
+    <div class="bars" id="aware" style="--lw:11em"></div>
+    <p class="note">체중이나 체형으로 비만을 판단하는 방법을 아는 보호자는 절반이 안 됩니다. 살찐 모습을 귀엽다고 보는 인식도 진단을 늦춥니다.</p>
+  </div>
+  <p class="src">출처: 이데일리, 국립축산과학원 건강관리정보, 데일리벳(로얄캐닌 자료), 펫쏙쏙, KB경영연구소 2025 보고서</p>
+</section>
+
+<section class="slide">
+  <div class="eyebrow rv">보호자의 대응</div>
+  <h2 class="rv" style="--i:1">가장 먼저 손대는 것은 <em>간식</em></h2>
+  <div class="cols c32">
+    <div class="stack rv" style="--i:2"><div class="bars" id="manage" style="--lw:10em"></div>
+      <div class="axisnote">비만 관리 방법(%) · 중복응답</div></div>
+    <div class="stack rv" style="--i:3">
+      <div class="big">69.9<small>%</small></div>
+      <p style="color:var(--ink2)">보호자 열 명 중 일곱 명이 간식량을 조절한다고 답했습니다. 병원 진료(15.5%)보다 네 배 넘게 많습니다.</p>
+      <p class="note">간식을 끊기 어려운 보호자에게 저칼로리 간식은 현실적인 대안입니다. 그래서 시중 간식을 직접 조사했습니다.</p>
+    </div>
+  </div>
+  <p class="src">출처: KB경영연구소 「2025 한국 반려동물 보고서」 이슈2</p>
+</section>
+
+<section class="slide">
+  <div class="eyebrow rv">비용</div>
+  <h2 class="rv" style="--i:1">비만 판정을 받으면 치료비가 <em>2.3배</em></h2>
+  <div class="cols c2">
+    <div class="stack rv" style="--i:2"><b>월 양육비 (만 원)</b><div class="bars" id="cost1" style="--lw:6em"></div><div class="axisnote">1.6배 차이</div></div>
+    <div class="stack rv" style="--i:3"><b>최근 2년 치료비 (만 원)</b><div class="bars" id="cost2" style="--lw:6em"></div><div class="axisnote">2.3배 차이</div></div>
+  </div>
+  <div class="legend rv" style="--i:4"><span class="kb">비만 판정 없음</span><span class="ka">비만 판정 받음</span></div>
+  <p class="note rv" style="--i:5">비만은 당뇨, 관절·호흡기·심혈관 질환과 연결됩니다. 간식비를 아끼는 것보다 체중을 관리하는 쪽이 지출을 더 크게 줄입니다.</p>
+  <p class="src">출처: KB경영연구소 「2025 한국 반려동물 보고서」 이슈2, 이데일리</p>
+</section>
+
+<section class="slide">
+  <div class="eyebrow rv">데이터 수집</div>
+  <h2 class="rv" style="--i:1">다이어트 간식 <em>36개</em>를 모았다</h2>
+  <div class="flow rv" style="--i:2">
+    <div><div class="big" data-n="7">7</div><p>검색어. 다이어트·저칼로리·저지방·체중조절 간식</p></div>
+    <div><div class="big" data-n="70">70</div><p>검색 결과. 쿠팡 40건, 다나와 30건</p></div>
+    <div><div class="big" data-n="36">36</div><p>중복 옵션과 무관한 상품을 뺀 고유 상품</p></div>
+    <div><div class="big" data-n="20">20</div><p>상품명·스펙에 체중관리 표기가 있는 상품</p></div>
+  </div>
+  <div class="cols c2 rv" style="--i:3;align-items:start">
+    <p class="note">쿠팡은 공식 파트너스 API, 다나와는 공개 검색 결과를 썼습니다. 네이버 쇼핑은 조회 오류로 빠졌습니다.</p>
+    <p class="note">리뷰 수와 평점, 실제 열량(kcal)은 데이터에 없습니다. 인기는 검색 노출로, 다이어트 여부는 상품 표기로 판단했습니다.</p>
+  </div>
+  <p class="src">자체 수집: 2026-10-02, 쿠팡 파트너스 API·다나와 가격비교 (k-skill). 조회 시점 노출가 기준</p>
+</section>
+
+<section class="slide">
+  <div class="eyebrow rv">분석 1 · 표기</div>
+  <h2 class="rv" style="--i:1">절반은 <em>"다이어트"</em>라는 단어로 판다</h2>
+  <div class="cols c2">
+    <div class="stack rv" style="--i:2">
+      <b>36개 상품 구성</b>
+      <div class="share"><i style="--n:12;--c:var(--a)" data-tip="쿠팡 · 체중관리 표기 12개"></i><i style="--n:8;--c:var(--b)" data-tip="다나와 · 체중관리 표기 8개"></i><i style="--n:16;--c:var(--muted)" data-tip="일반 간식 16개"></i></div>
+      <div class="legend"><span class="ka">쿠팡 표기 12</span><span class="kb">다나와 표기 8</span><span class="kn">일반 간식 16</span></div>
+      <p class="note">다이어트 검색어로 찾아도 결과의 44%는 체중관리 표기가 없는 일반 간식이었습니다. 검색 결과를 그대로 믿으면 안 됩니다.</p>
+    </div>
+    <div class="stack rv" style="--i:3"><b>체중관리 표기 20개의 키워드</b><div class="bars" id="kw" style="--lw:7em"></div>
+      <div class="axisnote">상품 수 · 한 상품에 여러 키워드 가능</div></div>
+  </div>
+  <p class="src">자체 수집 데이터 36개 (2026-10-02)</p>
+</section>
+
+<section class="slide">
+  <div class="eyebrow rv">분석 2 · 가격</div>
+  <h2 class="rv" style="--i:1">가격을 가르는 것은 표기보다 <em>파는 곳</em></h2>
+  <svg class="strip rv" style="--i:2;width:100%;flex:1;min-height:0" viewBox="0 0 1000 300" id="strip" role="img" aria-label="10g당 가격 분포. 다나와 상품은 100원 안팎, 쿠팡 상품은 300~900원대에 모여 있음"></svg>
+  <div class="cols c2 rv" style="--i:3;flex:none;align-items:start">
+    <div class="legend"><span class="ka">쿠팡</span><span class="kb">다나와</span><span style="--c:var(--ink)">굵은 선: 중앙값</span></div>
+    <p class="note">체중관리 표기 상품의 중앙값은 229원으로 일반 간식(136원)보다 비쌉니다. 하지만 다나와 상품은 표기와 상관없이 90원 안팎, 쿠팡은 360~680원대입니다.</p>
+  </div>
+  <p class="src">단가를 알 수 있는 24개 기준. 가로축은 로그 눈금. 다나와 단가는 다나와 표기값이며 일부는 묶음 가격일 수 있음</p>
+</section>
+
+<section class="slide">
+  <div class="eyebrow rv">분석 3 · 가성비</div>
+  <h2 class="rv" style="--i:1">10g당 100원 아래는 <em>맘오리 다이어트 안심</em> 시리즈</h2>
+  <div class="cols c32">
+    <div class="stack rv" style="--i:2"><div class="bars" id="value" style="--lw:13em"></div>
+      <div class="axisnote">체중관리 표기 상품의 10g당 가격(원) · 낮을수록 가성비가 좋음</div></div>
+    <div class="stack rv" style="--i:3">
+      <div class="legend"><span class="kb">다나와</span><span class="ka">쿠팡</span></div>
+      <p style="color:var(--ink2)">가장 싼 상품과 열 번째 상품의 단가 차이는 약 9배입니다.</p>
+      <p class="note">쿠팡에서는 닥터케어누트 비건 져키(229원)와 살빠지는이유 덴탈(320원)이 저렴했습니다. 살빠지는이유는 50g 20개 묶음 기준이라 한 번에 3만 2천 원을 써야 합니다.</p>
+    </div>
+  </div>
+  <p class="src">자체 수집 데이터. 단가가 확인된 체중관리 표기 13개 중 상위 10개</p>
+</section>
+
+<section class="slide">
+  <div class="eyebrow rv">분석 4 · 인기</div>
+  <h2 class="rv" style="--i:1">어떤 검색어로 찾아도 나오는 상품</h2>
+  <div class="cols c32">
+    <div class="stack rv" style="--i:2" id="pop"></div>
+    <div class="stack rv" style="--i:3">
+      <div class="legend"><span class="ka">체중관리 표기</span><span class="kn">일반 간식</span></div>
+      <p style="color:var(--ink2)">쿠팡 검색어 4개 중 몇 개에 노출됐는지를 셌습니다. 선진펫 살뺄곤약만 네 번 모두 나왔습니다.</p>
+      <p class="note">리뷰 수가 없어서 쓴 대리 지표입니다. 광고 노출이 섞였을 수 있어 실제 판매량과는 다를 수 있습니다.</p>
+    </div>
+  </div>
+  <p class="src">자체 수집 데이터. 쿠팡 20개 상품 중 2개 이상 검색어에 노출된 7개</p>
+</section>
+
+<section class="slide">
+  <div class="eyebrow rv">적용</div>
+  <h2 class="rv" style="--i:1">우리 푸들의 <em>하루 간식 예산</em>은 몇 kcal일까</h2>
+  <div class="cols c2">
+    <div class="stack rv" style="--i:2">
+      <label for="kg"><b>목표 체중 <span id="kgv">5.0</span> kg</b></label>
+      <input type="range" id="kg" min="2" max="12" step="0.5" value="5">
+      <div class="axisnote">2kg ~ 12kg · 슬라이더를 움직여 보세요</div>
+      <div class="meter" aria-hidden="true"><i></i></div>
+      <div class="legend"><span class="ka">간식 10%</span><span style="--c:var(--track)">사료 90%</span></div>
+    </div>
+    <div class="stack rv" style="--i:3">
+      <div class="stat"><div class="big"><span id="rer">234</span><small>kcal</small></div><div class="lab">하루 기초 필요 열량 (RER = 70 × 체중<sup>0.75</sup>)</div></div>
+      <div class="stat"><div class="big" style="color:var(--accent-ink)"><span id="treat">23</span><small>kcal</small></div><div class="lab">간식에 쓸 수 있는 상한 (10%)</div></div>
+    </div>
+  </div>
+  <p class="note rv" style="--i:4">일반 공식으로 낸 대략치입니다. 감량은 주당 체중의 1~2%가 안전한 범위이며, 실제 급여량은 수의사와 정하세요. 조사한 간식의 열량은 상세페이지에서 확인해야 합니다.</p>
+  <p class="src">RER은 수의영양학에서 쓰는 표준 공식. 10% 원칙: 국립축산과학원, 이데일리</p>
+</section>
+
+<section class="slide">
+  <div class="eyebrow rv">결론</div>
+  <h2 class="rv" style="--i:1">간식을 끊지 말고, <em>고르고 재서</em> 주자</h2>
+  <div class="cols c32" style="align-items:start">
+    <ol class="take rv" style="--i:2">
+      <li>국내 반려동물의 <b>14.7%</b>가 비만 판정을 받았고, 판정받은 가정은 치료비를 <b>2.3배</b> 씁니다.</li>
+      <li>보호자의 <b>69.9%</b>가 간식량부터 조절합니다. 간식은 하루 열량의 <b>10%</b> 안에서 줍니다.</li>
+      <li>다이어트 검색 결과의 <b>44%</b>는 일반 간식입니다. 표기와 성분을 확인해야 합니다.</li>
+      <li>같은 표기라도 단가는 최대 <b>9배</b> 차이 납니다. 가격은 표기보다 판매 채널이 갈랐습니다.</li>
+    </ol>
+    <div class="stack rv" style="--i:3">
+      <b>먼저 살펴볼 후보</b>
+      <p style="font-size:.9em;color:var(--ink2)"><b style="color:var(--ink)">가성비</b> 맘쿡 맘오리 다이어트 안심 (10g당 76~85원)</p>
+      <p style="font-size:.9em;color:var(--ink2)"><b style="color:var(--ink)">노출 1위</b> 선진펫 살뺄곤약 젤리 (검색어 4개 모두)</p>
+      <p style="font-size:.9em;color:var(--ink2)"><b style="color:var(--ink)">쿠팡 저단가</b> 닥터케어누트 비건 져키 (229원), 살빠지는이유 덴탈 (320원)</p>
+      <p class="note">한계: 표본 36개, 하루치 조회, 열량과 리뷰 데이터 없음. 추천이 아닌 후보입니다.</p>
+    </div>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="eyebrow rv">출처</div>
+  <h2 class="rv" style="--i:1">참고한 자료</h2>
+  <ul class="srcs rv" style="--i:2">
+    <li>KB경영연구소 「2025 한국 반려동물 보고서」 이슈2 반려동물 비만 관리 — <a href="https://kbthink.com/investment/deepdive/research/250629-8.html">kbthink.com</a></li>
+    <li>데일리벳 「국내 반려동물 14.7% 수의사에게 비만 판정 받아…치료비 지출 2.3배 커」 — <a href="https://www.dailyvet.co.kr/news/practice/companion-animal/253229">dailyvet.co.kr</a></li>
+    <li>데일리벳 「국내 반려견 546만·반려묘 217만 마리 추산」 — <a href="https://www.dailyvet.co.kr/news/industry/250412">dailyvet.co.kr</a></li>
+    <li>데일리벳 「BCS 8~9단계 비만 반려동물 증가... 4가지 비만 관리 방법은?」 — <a href="https://www.dailyvet.co.kr/news/practice/companion-animal/203401">dailyvet.co.kr</a></li>
+    <li>한국일보 「반려동물 비만, 귀엽다고 지나쳐선 안돼요」(2017) — <a href="https://www.hankookilbo.com/news/article/201704121626614820">hankookilbo.com</a></li>
+    <li>이데일리 「반려견 비만은 질병의 적신호」 — <a href="https://edaily.co.kr/News/Read?mediaCodeNo=257&newsId=02683046619212200">edaily.co.kr</a></li>
+    <li>국립축산과학원 반려동물 건강관리정보 — <a href="https://nias.go.kr/companion/new_petBoardView.do?cmCode=M170711160003945&boardSeqNum=8&currPage=1&serial=8">nias.go.kr</a></li>
+    <li>간식 데이터: 쿠팡 파트너스 API, 다나와 가격비교에서 2026-10-02 직접 수집 (36개 상품). 쿠팡 파트너스 활동을 통해 일정액의 수수료를 제공받을 수 있습니다.</li>
+  </ul>
+</section>
+
+</main></div>
+<nav aria-label="슬라이드 이동">
+  <button id="pv" type="button" aria-label="이전 슬라이드">←</button>
+  <span class="cnt" id="cnt">1 / 16</span>
+  <button id="nx" type="button" aria-label="다음 슬라이드">→</button>
+  <span class="prog"><i id="pg"></i></span>
+  <button id="fs" type="button">전체 화면</button>
+</nav>
+<div id="tip" hidden></div>
+
+<script>
+(function(){
+var $=function(s,r){return (r||document).querySelector(s)}, $$=function(s,r){return [].slice.call((r||document).querySelectorAll(s))};
+var A='var(--a)',B='var(--b)',N='var(--muted)';
+
+function bars(id,items,max,ref){
+  $('#'+id).innerHTML=items.map(function(d,i){
+    return '<div class="row'+(d.hl?' hl':'')+'" data-tip="'+d.l+' · '+d.v+(d.u||'')+'"><span class="l">'+d.l+'</span><span class="t"><i style="--w:'+(d.v/max*100)+'%;--i:'+i+';--c:'+(d.c||B)+'"></i>'+(ref?'<u style="--x:'+(ref/max*100)+'%"></u>':'')+'</span><span class="v">'+d.v+'</span></div>';
+  }).join('');
+}
+bars('breed',[{l:'요크셔테리어',v:29.2},{l:'치와와',v:27.0},{l:'포메라니안',v:22.2},{l:'몰티즈',v:16.0},{l:'비숑 프리제',v:11.3},{l:'말티푸',v:11.1,c:A,hl:1},{l:'믹스견',v:10.7}].map(function(d){d.u='%';return d}),32,14.7);
+bars('aware',[{l:'눈바디 추정법 인지',v:48.2,u:'%'},{l:'체중 기준 진단법 인지',v:43.8,u:'%'}],100);
+bars('manage',[{l:'간식량 조절',v:69.9,c:A,hl:1},{l:'사료 급여량 조절',v:63.5},{l:'운동·활동량 조절',v:51.5},{l:'사료 종류 변경',v:38.8},{l:'규칙적 배식',v:29.6},{l:'병원 진료·검진',v:15.5},{l:'보조제·영양제',v:12.0}].map(function(d){d.u='%';return d}),75);
+bars('cost1',[{l:'판정 없음',v:17.8,u:'만 원'},{l:'판정 받음',v:28.3,c:A,u:'만 원'}],30);
+bars('cost2',[{l:'판정 없음',v:84.1,u:'만 원'},{l:'판정 받음',v:190.5,c:A,u:'만 원'}],200);
+bars('kw',[{l:'다이어트',v:10,c:A,hl:1},{l:'저칼로리',v:4},{l:'체중관리',v:3},{l:'비건',v:3},{l:'저지방·low fat',v:3},{l:'야채',v:2},{l:'기타 5종',v:5}].map(function(d){d.u='개';return d}),11);
+bars('value',[['맘오리 다이어트 안심 오리',76,B],['맘오리 다이어트 안심 슬라이스',77,B],['맘오리 다이어트 안심 껌말이',78,B],['맘오리 다이어트 안심 쌀스틱',85,B],['바우와우 혼합 간식',98,B],['그린펫 야미야미 순닭가슴살',118,B],['닥터케어누트 비건 져키',229,A],['살빠지는이유 저칼로리 덴탈',320,A],['힐링펫 다이어트 밀크스틱',540,B],['하루조이 미니 저칼로리',683,A]].map(function(d){return {l:d[0],v:d[1],c:d[2],u:'원/10g'}}),720);
+
+$$('.waffle').forEach(function(w){var n=+w.dataset.fill,h='';for(var i=0;i<100;i++)h+='<b'+(i<n?' class="f" style="--i:'+i+'"':'')+'></b>';w.innerHTML=h});
+
+$('#pop').innerHTML=[['선진펫 살뺄곤약 젤리',4,A],['펫생각 하루조이 미니 저칼로리',3,A],['살빠지는이유 저칼로리 덴탈',3,A],['펫테일 비건바이츠 야채 트릿',3,A],['듀먼 오븐 바삭 저염 수제간식',3,N],['와그작 톡톡 미니 트릿',2,N],['제로랩스 영양가득 져키',2,N]].map(function(d){
+  var p='';for(var i=0;i<4;i++)p+='<b'+(i<d[1]?' class="f" style="--i:'+i+';--c:'+d[2]+'"':'')+'></b>';
+  return '<div class="row" style="--lw:15em;font-size:.9em" data-tip="'+d[0]+' · 검색어 4개 중 '+d[1]+'개 노출"><span class="l">'+d[0]+'</span><span class="pips">'+p+'</span><span class="v">'+d[1]+' / 4</span></div>';
+}).join('');
+
+// strip plot: 10g당 가격 (log scale 40~1200)
+(function(){
+  var D={d:[[76,'d','맘오리 안심 오리'],[77,'d','맘오리 안심 슬라이스'],[78,'d','맘오리 안심 껌말이'],[85,'d','맘오리 안심 쌀스틱'],[98,'d','바우와우 혼합 간식'],[118,'d','그린펫 순닭가슴살'],[229,'c','닥터케어누트 비건 져키'],[320,'c','살빠지는이유 덴탈'],[540,'d','힐링펫 밀크스틱'],[683,'c','하루조이 미니'],[792,'d','힐링펫 두부닭 스틱'],[905,'c','라이펫 low fat 스틱'],[945,'c','아모망 스니피 트릿']],
+         g:[[52,'d','테비 사사미 오리 꽈배기'],[75,'d','펫더맨 젤리습식'],[84,'d','홈쿡 그릴스테이크'],[92,'d','테비 사사미 치킨꽈배기'],[93,'c','바른츄 소고기 육포'],[136,'d','웁스 닭가슴살'],[169,'c','제로랩스 져키'],[197,'d','테비트릿 점보 닭가슴살'],[363,'c','레디펫고 홍삼져키'],[470,'c','많이드시개 닭가슴살'],[833,'c','와그작 톡톡 미니 트릿']]};
+  var L=190,R=980,lo=Math.log10(40),hi=Math.log10(1200);
+  function x(v){return L+(Math.log10(v)-lo)/(hi-lo)*(R-L)}
+  var s='',k=0;
+  [50,100,200,500,1000].forEach(function(t){s+='<line x1="'+x(t)+'" y1="30" x2="'+x(t)+'" y2="250"/><text x="'+x(t)+'" y="278" text-anchor="middle" font-size="17">'+t+'원</text>'});
+  [['d','체중관리 표기',95,229,13],['g','일반 간식',195,136,11]].forEach(function(r){
+    s+='<text class="lab" x="0" y="'+(r[2]+2)+'" font-size="19">'+r[1]+'</text><text x="0" y="'+(r[2]+26)+'" font-size="15">'+r[4]+'개 · 중앙값 '+r[3]+'원</text>';
+    s+='<line class="med" x1="'+x(r[3])+'" y1="'+(r[2]-38)+'" x2="'+x(r[3])+'" y2="'+(r[2]+38)+'"/>';
+    D[r[0]].forEach(function(p,i){s+='<circle cx="'+x(p[0])+'" cy="'+(r[2]+[-16,0,16][i%3])+'" r="10" fill="var(--'+(p[1]=='c'?'a':'b')+')" style="--i:'+(k++)+'" data-tip="'+p[2]+' · '+p[0]+'원/10g · '+(p[1]=='c'?'쿠팡':'다나와')+'"/>'});
+  });
+  $('#strip').innerHTML=s;
+})();
+
+// calculator
+var kg=$('#kg');
+function calc(){var w=+kg.value,r=70*Math.pow(w,.75);$('#kgv').textContent=w.toFixed(1);$('#rer').textContent=Math.round(r);$('#treat').textContent=Math.round(r/10)}
+kg.addEventListener('input',calc);calc();
+
+// tooltip
+var tip=$('#tip');
+document.addEventListener('pointermove',function(e){var t=e.target.closest&&e.target.closest('[data-tip]');
+  if(!t){tip.hidden=true;return}
+  tip.textContent=t.dataset.tip;tip.hidden=false;
+  var x=Math.min(e.clientX+14,innerWidth-tip.offsetWidth-8),y=e.clientY+16;if(y+tip.offsetHeight>innerHeight)y=e.clientY-tip.offsetHeight-10;
+  tip.style.left=x+'px';tip.style.top=y+'px'});
+
+// deck
+var S=$$('.slide'),cur=0,stacked=matchMedia('(max-width:700px) and (orientation:portrait)'),still=matchMedia('(prefers-reduced-motion: reduce)').matches;
+function count(sl){ if(still)return; $$('[data-n]',sl).forEach(function(el){var to=+el.dataset.n,d=+(el.dataset.d||0),t0=performance.now();
+  (function f(t){var p=Math.min((t-t0)/900,1);el.textContent=(to*(1-Math.pow(1-p,3))).toFixed(d);if(p<1)requestAnimationFrame(f);else el.textContent=to.toFixed(d)})(t0)}) }
+function go(n,quiet){n=Math.max(0,Math.min(S.length-1,n));
+  if(stacked.matches){S.forEach(function(s){s.classList.add('on')});return}
+  S.forEach(function(s,i){s.classList.toggle('on',i===n);s.classList.toggle('prev',i<n)});
+  if(n!==cur||!quiet)count(S[n]);cur=n;
+  $('#cnt').textContent=(n+1)+' / '+S.length;$('#pg').style.width=((n+1)/S.length*100)+'%';
+  try{history.replaceState(null,'','#'+(n+1))}catch(e){}}
+$('#pv').onclick=function(){go(cur-1)};$('#nx').onclick=function(){go(cur+1)};
+document.addEventListener('keydown',function(e){if(e.target.tagName==='INPUT')return;
+  var k=e.key;if(k==='ArrowRight'||k==='PageDown'||k===' '){e.preventDefault();go(cur+1)}
+  else if(k==='ArrowLeft'||k==='PageUp'){e.preventDefault();go(cur-1)}else if(k==='Home')go(0);else if(k==='End')go(S.length-1)});
+var tx=null,st=$('#stage');
+st.addEventListener('touchstart',function(e){tx=e.target.tagName==='INPUT'?null:e.touches[0].clientX},{passive:true});
+st.addEventListener('touchend',function(e){if(tx===null)return;var dx=e.changedTouches[0].clientX-tx;if(Math.abs(dx)>50)go(cur+(dx<0?1:-1));tx=null});
+$('#fs').onclick=function(){var p=document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen();if(p&&p.catch)p.catch(function(){})};
+stacked.addEventListener&&stacked.addEventListener('change',function(){go(cur,true)});
+go(Math.max(0,(parseInt(location.hash.slice(1),10)||1)-1),true);
+})();
+</script>
